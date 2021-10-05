@@ -1,0 +1,79 @@
+from typing import Dict
+import requests
+import pandas as pd
+import socket
+import json
+from selenium import webdriver
+
+# ======================================
+url_netify = "https://www.netify.ai/resources/applications"
+driver  = webdriver.Chrome("C:\\Users\\thangbd\\Desktop\\chromedriver.exe")
+driver.get(url_netify)
+file_domain = open("domain.txt","a")
+file_domain.seek(0)
+file_domain.truncate()
+print("Starting crawl service name ....")
+
+all_data = driver.find_elements_by_class_name("odd")
+for data in all_data:
+    domain_temp = data.text[data.text.find("netify."):data.text.find(" Details")]
+    domain_name = domain_temp.split(".")[1]
+    file_domain.write(domain_name+"\n")
+
+all_data = driver.find_elements_by_class_name("even")
+for data in all_data:
+    domain_temp = data.text[data.text.find("netify."):data.text.find(" Details")]
+    domain_name = domain_temp.split(".")[1]
+    file_domain.write(domain_name+"\n")
+file_domain.close() 
+driver.close()
+
+print("Crawl service name successfully ....")
+
+# ===================================
+
+print("Starting collecting service data ....")
+final = []
+f = open("domain.txt", "r")
+for x in f:
+    try:
+        service_api = x.split("\n")[0]
+        print("Collecting service",service_api.upper())
+        url = 'https://informatics.netify.ai/api/v2/lookup/applications/'+service_api
+        r = requests.get(url)
+        data = json.loads(r.text)
+        for i in range (len(data["data"]["domain_list"])):
+            service = data["data"]["label"].upper()
+            category = data["data"]["domain_list"][i]["category"]["label"]
+            domain = data["data"]["domain_list"][i]["label"]
+            final.append([service,category,domain,"",socket.gethostbyname(domain)])
+            url_domain = f'https://www.threatcrowd.org/searchApi/v2/domain/report/?domain={domain}'
+            req = requests.get(url_domain)
+            data_sub_domain = json.loads(req.text)
+            for j in range(len(data_sub_domain["subdomains"])):
+                subdomain = data_sub_domain["subdomains"][j]
+                try:
+                    ip = socket.gethostbyname(subdomain)
+                except:
+                    ip = "null"
+                final.append([service,category,domain,subdomain,ip])
+    except:
+        True
+col = [
+    'service',
+    'category',
+    'domain',
+    'sub_domain',
+    'ip'
+]
+
+data = pd.DataFrame(final , columns = col)
+data.to_csv('data.csv',index = False)
+print("")
+print("COLLECT SUCCESS...")
+print("Check results in file data.csv")
+input()
+    
+
+
+# =============================================================================
